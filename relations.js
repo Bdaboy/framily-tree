@@ -1,10 +1,4 @@
-var brothers = [
-{
-    "name": "Jack W.",
-    "graduated": true,
-    "familystarted": "Saints"
-  },
-];
+var brothers = [];
 if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
   module.exports = brothers;
 }
