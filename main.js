@@ -3,18 +3,23 @@
 // Mock out dependencies for testing on NodeJS. These are imported in HTML in
 // the browser.
 /* eslint-disable */
+/* istanbul ignore else */
 if (typeof brothers === 'undefined') {
   brothers = require('./relations');
 }
+/* istanbul ignore else */
 if (typeof tinycolor === 'undefined') {
   tinycolor = require('tinycolor2');
 }
+/* istanbul ignore else */
 if (typeof $ === 'undefined') {
   $ = require('jquery');
 }
+/* istanbul ignore else */
 if (typeof vis === 'undefined') {
   vis = require('vis');
 }
+/* istanbul ignore else */
 if (typeof didYouMean === 'undefined') {
   didYouMean = require('didyoumean');
 }
@@ -23,15 +28,15 @@ if (typeof didYouMean === 'undefined') {
 var network = null;
 
 var createNodesCalled = false;
-var nodes = [];
-var edges = [];
+var nodesGlobal;
+var edgesGlobal;
 var nodesDataSet;
 var edgesDataSet;
-var UNKNOWN_BIG_BRO = 'UNKNOWN';
-var unknownNode;
 
-var familyColor = {};
-var pledgeClassColor = {};
+var previousSearchFind;
+
+var familyColorGlobal = {};
+var pledgeClassColorGlobal = {};
 
 function ColorSpinner(colorObj, spinAmount) {
   this.spinAmount = spinAmount;
@@ -56,27 +61,35 @@ var getNewPledgeClassColor = (function () {
   };
 }());
 
-function didYouMeanWrapper(name) {
-  // We only compute the nameList in the case we call this. This should be
-  // uncommon, because it indicates we've already hit an unrecoverable
-  // data-entry bug.
-  var nameList = brothers.map(function (bro) {
+/* istanbul ignore next */
+/**
+ * In cases where we can't find an exact match for a brother's name, suggest
+ * similar alternatives. This is only called if there is a data entry error, and
+ * the purpose is to just give a hint as to how to fix the data entry issue.
+ * Since this is only called for data entry bugs, and those data entry bugs
+ * should not be submitted into the repo, this is currently untestable.
+ */
+function didYouMeanWrapper(invalidName) {
+  var allValidNames = brothers.map(function (bro) {
     return bro.name;
   });
-  return didYouMean(name, nameList);
+  // Find valid names which are similar to invalidName.
+  var similarValidName = didYouMean(invalidName, allValidNames);
+  return similarValidName;
 }
 
-// Only call this once (for effiencency & correctness)
-function createNodes() {
-  if (createNodesCalled) return;
-  createNodesCalled = true;
-
-  var oldLength = brothers.length;
+function createNodes(brothers_) {
+  var oldLength = brothers_.length;
   var newIdx = oldLength;
+
+  var nodes = [];
+  var edges = [];
+  var familyColor = {};
+  var pledgeClassColor = {};
 
   var familyToNode = {};
   for (var i = 0; i < oldLength; i++) {
-    var bro = brothers[i];
+    var bro = brothers_[i];
     bro.id = i;
 
     var lowerCaseFamily = (bro.familystarted || '').toLowerCase();
@@ -99,39 +112,31 @@ function createNodes() {
 
     if (bro.big && lowerCaseFamily) {
       // This person has a big bro, but they also started a new family of their
-      // own, so let's put them in both spots
+      // own. This person gets two nodes, one underneath their big bro and
+      // another underneath their new family.
 
-      // Create a placeholder node under his big bro
+      // Node underneath the big bro. This is a "fake" node: this will exist in
+      // the tree, however you can't search for it and it won't have any little
+      // bros.
       edges.push({ from: bro.big, to: newIdx });
       nodes.push(Object.assign({}, bro, {
         id: newIdx++, // increment
-        name: '', // some non-existing name
+        name: '', // some unsearchable name.
         label: '[' + bro.name + ']',
         family: bro.familystarted.toLowerCase(),
       }));
 
-      // Create the real node under his family
-      edges.push({ from: familyToNode[lowerCaseFamily].id, to: bro.id });
+      // Node underneath the new family. This is a "real" node: just like any
+      // other node, you can search for it and it will have little bros (if this
+      // brother had any little bros).
+      var familyNode = familyToNode[lowerCaseFamily];
+      edges.push({ from: familyNode.id, to: bro.id });
     } else if (!bro.big && !lowerCaseFamily) {
-      // This is a data entry error: everyone should have a big bro, or should
-      // have started a family. For now, just add some default value for both.
-      bro.big = UNKNOWN_BIG_BRO.toLowerCase();
-
-      if (!unknownNode) {
-        // And add a placeholder family node
-        familyColor[UNKNOWN_BIG_BRO.toLowerCase()] = getNewFamilyColor();
-        unknownNode = {
-          id: newIdx++, // increment
-          name: UNKNOWN_BIG_BRO.toLowerCase(),
-          label: UNKNOWN_BIG_BRO,
-          family: UNKNOWN_BIG_BRO.toLowerCase(),
-          inactive: true,
-          font: { size: 50 }, // super-size the font
-        };
-        familyToNode[UNKNOWN_BIG_BRO.toLowerCase()] = unknownNode;
-        nodes.push(unknownNode);
-      }
-      edges.push({ from: unknownNode.id, to: bro.id });
+      /* istanbul ignore next */
+      throw new Error(
+        'Encountered a little bro ('
+        + bro.name
+        + ') without a big bro. This is a data entry error.');
     } else if (lowerCaseFamily) {
       // This person founded a family, and has no big bro, so put his node
       // directly underneath the family node
@@ -170,7 +175,7 @@ function createNodes() {
     }
   });
 
-  // Fix the edges (that point from strings instead of node IDs)
+  // Fix the edges that point from strings instead of node IDs
   edges.forEach(function (edge) {
     if (typeof edge.from === 'string') {
       var name = edge.from;
@@ -204,6 +209,7 @@ function createNodes() {
     try {
       node.family = getFamily(node.big);
     } catch (e) {
+      /* istanbul ignore next */
       node.family = 'unknown';
     }
 
@@ -222,8 +228,40 @@ function createNodes() {
     }
   });
 
-  nodesDataSet = new vis.DataSet(nodes);
-  edgesDataSet = new vis.DataSet(edges);
+  return [nodes, edges, familyColor, pledgeClassColor];
+}
+
+// Only call this once (for effiencency & correctness)
+/* istanbul ignore next */
+function createNodesHelper() {
+  if (createNodesCalled) return;
+  createNodesCalled = true;
+
+  var output = createNodes(brothers);
+  nodesGlobal = output[0];
+  edgesGlobal = output[1];
+  familyColorGlobal = output[2];
+  pledgeClassColorGlobal = output[3];
+
+  nodesDataSet = new vis.DataSet(nodesGlobal);
+  edgesDataSet = new vis.DataSet(edgesGlobal);
+}
+
+function findBrother(name, nodes, prevElem) {
+  var lowerCaseName = name.toLowerCase();
+  var matches = nodes.filter(function (element) {
+    return element.name.toLowerCase().includes(lowerCaseName);
+  });
+  if (matches.length === 0) {
+    return undefined;
+  }
+
+  var idx = 0;
+  if (prevElem) {
+    idx = matches.indexOf(prevElem);
+    idx = (idx + 1) % matches.length;
+  }
+  return matches[idx];
 }
 
 /**
@@ -233,17 +271,16 @@ function createNodes() {
  * Returns whether or not the search succeeded. This always returns `true` for
  * an empty query.
  */
-function findBrother(name) {
+/* istanbul ignore next */
+function findBrotherHelper(name) {
   if (!name) return true; // Don't search for an empty query.
-  // This requires the network to be instantiated, which implies `nodes` has
-  // been populated.
+  // This requires the network to be instantiated, which implies `nodesGlobal`
+  // has been populated.
   if (!network) return false;
 
-  var lowerCaseName = name.toLowerCase();
-  var found = nodes.find(function (element) {
-    // return element.name === name;
-    return element.name.toLowerCase().includes(lowerCaseName);
-  });
+  var found = findBrother(name, nodesGlobal, previousSearchFind);
+  previousSearchFind = found;
+
   if (found) {
     network.focus(found.id, {
       scale: 0.9,
@@ -255,8 +292,9 @@ function findBrother(name) {
   return false; // Could not find a match
 }
 
+/* istanbul ignore next */
 function draw() {
-  createNodes();
+  createNodesHelper();
 
   var changeColor;
   var colorMethod = document.getElementById('layout').value;
@@ -271,19 +309,19 @@ function draw() {
     case 'pledgeClass':
       changeColor = function (node) {
         node.color = node.pledgeclass
-          ? pledgeClassColor[node.pledgeclass.toLowerCase()]
+          ? pledgeClassColorGlobal[node.pledgeclass.toLowerCase()]
           : 'lightgrey';
         nodesDataSet.update(node);
       };
       break;
     default: // 'family'
       changeColor = function (node) {
-        node.color = familyColor[node.family.toLowerCase()];
+        node.color = familyColorGlobal[node.family.toLowerCase()];
         nodesDataSet.update(node);
       };
       break;
   }
-  nodes.forEach(changeColor);
+  nodesGlobal.forEach(changeColor);
   if (!network) {
     // create a network
     var container = document.getElementById('mynetwork');
@@ -309,6 +347,9 @@ function draw() {
   }
 }
 
+/* istanbul ignore next */
+// This section is intended to only run in the browser, it does not run in
+// nodejs.
 if (typeof document !== 'undefined') {
   $(document).ready(function () {
     // Start the first draw
@@ -321,7 +362,7 @@ if (typeof document !== 'undefined') {
     };
     function search() {
       var query = $('#searchbox').val();
-      var success = findBrother(query);
+      var success = findBrotherHelper(query);
 
       // Indicate if the search succeeded or not.
       if (success) {
@@ -341,6 +382,9 @@ if (typeof document !== 'undefined') {
   });
 }
 
+/* istanbul ignore else */
 if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
   module.exports.createNodes = createNodes;
+  module.exports.createNodesHelper = createNodesHelper;
+  module.exports.findBrother = findBrother;
 }

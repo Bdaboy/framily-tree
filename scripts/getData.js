@@ -5,7 +5,7 @@ var fs = require('fs');
 // Forking instructions: if you are forking this project for your own
 // fraternity, you will need to change the SPREADSHEET_ID to match the URL of
 // your new Google spreadsheet:
-var SPREADSHEET_ID = '1h6dVJKtETWX3Kr9PT6EaLu0gGavdi8Gnj4IlX155pfY';
+var SPREADSHEET_ID = '1a25luO-nm0JKF8eGETLh-8tnY83kTmbJgWvHnnXUW1Q';
 
 var apiKey;
 try {
@@ -54,7 +54,8 @@ function (err, result) {
 
   var str = 'var brothers = ' + JSON.stringify(result, undefined, 2) + ';\n';
   // Turn this into a node module that we can `require()` for testing.
-  str += "if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {\n"
+  str += '/* istanbul ignore else */\n'
+       + "if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {\n"
        + '  module.exports = brothers;\n'
        + '}\n';
   fs.writeFileSync('relations.js', str);
