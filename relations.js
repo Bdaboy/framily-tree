@@ -3,7 +3,7 @@ var brothers = [
     "name": "Christopher Magos",
     "pledgeclass": "Fall 2006",
     "graduated": true,
-    "familystarted": "The Retards"
+    "familystarted": "The Idiots"
   },
   {
     "name": "Jonathon Zhu",
