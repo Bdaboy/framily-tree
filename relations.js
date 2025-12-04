@@ -406,7 +406,8 @@ var brothers = [
   {
     "name": "Diego de Blegiers",
     "big": "Youssef Saada",
-    "pledgeclass": "Fall 2022"
+    "pledgeclass": "Fall 2022",
+    "graduated": true
   },
   {
     "name": "Farid Mir",
@@ -567,6 +568,26 @@ var brothers = [
     "name": "Alex Konstantatos",
     "big": "Rocco Savo-Sardaro",
     "pledgeclass": "Fall 2025"
+  },
+  {
+    "name": "Marko Tomic",
+    "big": "Ben Cooper",
+    "pledgeclass": "Fall 2050"
+  },
+  {
+    "name": "Cole Hunter",
+    "big": "Ben Cooper",
+    "pledgeclass": "Fall 2050"
+  },
+  {
+    "name": "James Panket",
+    "big": "Ben Cooper",
+    "pledgeclass": "Fall 2050"
+  },
+  {
+    "name": "Liam Hinton",
+    "big": "Ben Cooper",
+    "pledgeclass": "Fall 2050"
   }
 ];
 /* istanbul ignore else */
