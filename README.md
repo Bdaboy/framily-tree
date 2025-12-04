@@ -39,11 +39,11 @@ instructions](https://github.com/nfischer/framily-tree/wiki/Forking-instructions
 ## License
 
 All original source files are licensed under the MIT license. All dependencies
-are licensed under their respective open source licenses. The Theta Chi flag
+are licensed under their respective open source licenses. The Lambda Chi Alpha flag
 image was downloaded from [this
 site](https://upload.wikimedia.org/wikipedia/en/d/df/OX_Flag.png). The data
 displayed on this web page is populated by this [google spreadsheet] and is
-property of Theta Chi Fraternity Beta Alpha chapter and its initiates.
+property of Lambda Chi Alpha Epsilon Epsilon Zeta and its initiates.
 
 <!--
   Forking instructions: if you are forking this project for your own
@@ -53,7 +53,7 @@ property of Theta Chi Fraternity Beta Alpha chapter and its initiates.
 
 [Actions badge]: https://img.shields.io/github/actions/workflow/status/nfischer/framily-tree/main.yml?style=flat-square&logo=github
 [GitHub Workflow]: https://github.com/nfischer/framily-tree/actions/workflows/main.yml
-[GitHub Pages]: https://nfischer.github.io/framily-tree
+[GitHub Pages]: https://bdaboy.github.io/framily-tree
 [Codecov badge]: https://img.shields.io/codecov/c/github/nfischer/framily-tree/main.svg?style=flat-square&label=coverage
 [Codecov link]: https://codecov.io/gh/nfischer/framily-tree
-[google spreadsheet]: https://docs.google.com/spreadsheets/d/1h6dVJKtETWX3Kr9PT6EaLu0gGavdi8Gnj4IlX155pfY/edit?usp=sharing
+[google spreadsheet]: https://docs.google.com/spreadsheets/d/1a25luO-nm0JKF8eGETLh-8tnY83kTmbJgWvHnnXUW1Q/edit?gid=413524035#gid=413524035
