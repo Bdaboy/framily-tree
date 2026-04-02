@@ -15,18 +15,33 @@ describe('framily-tree', function () {
     beforeEach(function () {
       var brothers = [
         {
-          'name': 'Joe Smith',
+          'name': 'Joe Miller',
           'graduated': true,
           'familystarted': 'Family One'
         },
         {
           'name': 'Alex Brown',
-          'big': 'Joe Smith',
+          'big': 'Joe Miller',
           'graduated': true
         },
         {
-          'name': 'Joe NotSmith',
-          'big': 'Joe Smith',
+          'name': 'Joe Millerson',
+          'big': 'Joe Miller',
+          'graduated': true
+        },
+        {
+          'name': 'Joe Grandmiller',
+          'big': 'Joe Millerson',
+          'graduated': true
+        },
+        {
+          'name': ' \xA0Matt    Trailingwhitespace ', // Intentional trailing whitespace
+          'big': 'Joe Miller',
+          'graduated': true
+        },
+        {
+          'name': 'Matt Little',
+          'big': 'Matt\t\xA0\tTrailingwhitespace', // Also weird whitespace, but different than above
           'graduated': true
         },
       ];
@@ -41,42 +56,83 @@ describe('framily-tree', function () {
     });
 
     it('can find exact match', function () {
-      var result = main.findBrother('Joe Smith', state.nodes);
-      result.name.should.equal('Joe Smith');
+      var result = main.findBrother('Joe Miller', state.nodes);
+      result.name.should.equal('Joe Miller');
       result = main.findBrother('Alex Brown', state.nodes);
       result.name.should.equal('Alex Brown');
     });
 
     it('can find case-insensitive match', function () {
-      var result = main.findBrother('JoE SmItH', state.nodes);
-      result.name.should.equal('Joe Smith');
+      var result = main.findBrother('JoE MiLlEr', state.nodes);
+      result.name.should.equal('Joe Miller');
       result = main.findBrother('AlEx bRoWn', state.nodes);
       result.name.should.equal('Alex Brown');
     });
 
     it('can match by first name', function () {
       var result = main.findBrother('Joe', state.nodes);
-      result.name.should.equal('Joe Smith');
+      result.name.should.equal('Joe Miller');
       result = main.findBrother('Alex', state.nodes);
       result.name.should.equal('Alex Brown');
     });
 
     it('can match by substring', function () {
-      var result = main.findBrother('Joe S', state.nodes);
-      result.name.should.equal('Joe Smith');
+      var result = main.findBrother('Joe M', state.nodes);
+      result.name.should.equal('Joe Miller');
       result = main.findBrother('Al', state.nodes);
       result.name.should.equal('Alex Brown');
     });
 
-    it('will advance through multiple matches', function () {
-      var result = main.findBrother('Joe', state.nodes);
-      result.name.should.equal('Joe Smith');
+    it('advances through multiple matches (default = FORWARD)', function () {
+      var result = main.findBrother('Joe', state.nodes, '');
+      result.name.should.equal('Joe Miller');
       // Advance to the next match.
       result = main.findBrother('Joe', state.nodes, result);
-      result.name.should.equal('Joe NotSmith');
+      result.name.should.equal('Joe Millerson');
+      // Advance to the next match.
+      result = main.findBrother('Joe', state.nodes, result);
+      result.name.should.equal('Joe Grandmiller');
       // And it also wraps around to the start of the matches.
       result = main.findBrother('Joe', state.nodes, result);
-      result.name.should.equal('Joe Smith');
+      result.name.should.equal('Joe Miller');
+    });
+
+    it('advances backward through multiple matches', function () {
+      var BACKWARD = main.DIRECTION.BACKWARD;
+      var result = main.findBrother('Joe', state.nodes, '', BACKWARD);
+      result.name.should.equal('Joe Miller');
+      // Advance to the previous match (wrap around to the end).
+      result = main.findBrother('Joe', state.nodes, result, BACKWARD);
+      result.name.should.equal('Joe Grandmiller');
+      // Advance to the previous match.
+      result = main.findBrother('Joe', state.nodes, result, BACKWARD);
+      result.name.should.equal('Joe Millerson');
+      // Advance back to the first match.
+      result = main.findBrother('Joe', state.nodes, result, BACKWARD);
+      result.name.should.equal('Joe Miller');
+    });
+
+    it('it stays on same match for DIRECTION.SAME_POSITION', function () {
+      var SAME_POSITION = main.DIRECTION.SAME_POSITION;
+      var result = main.findBrother('Joe', state.nodes, '', SAME_POSITION);
+      result.name.should.equal('Joe Miller');
+      // Do not change if the search query is the same.
+      result = main.findBrother('Joe', state.nodes, result, SAME_POSITION);
+      result.name.should.equal('Joe Miller');
+      // Search query is updated, but it matches the same person.
+      result = main.findBrother('Joe M', state.nodes, result, SAME_POSITION);
+      result.name.should.equal('Joe Miller');
+      // Update the search query only when the match yields different results.
+      result = main.findBrother('Joe Millers', state.nodes, result, SAME_POSITION);
+      result.name.should.equal('Joe Millerson');
+    });
+
+    it('normalizes names and handles whitespace', function () {
+      var result = main.findBrother('Matt Trailingwhitespace', state.nodes);
+      result.name.should.equal('Matt Trailingwhitespace');
+
+      result = main.findBrother('Matt Little', state.nodes);
+      result.big.name.should.equal('Matt Trailingwhitespace');
     });
   });
 });

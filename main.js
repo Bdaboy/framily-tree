@@ -35,6 +35,14 @@ var edgesDataSet;
 
 var previousSearchFind;
 
+var DIRECTION = {
+  FORWARD: 0,
+  BACKWARD: 1,
+  SAME_POSITION: 2,
+};
+
+var KEYCODE_ENTER = 13;
+
 var familyColorGlobal = {};
 var pledgeClassColorGlobal = {};
 
@@ -78,6 +86,24 @@ function didYouMeanWrapper(invalidName) {
   return similarValidName;
 }
 
+function normalizeName(name) {
+  name = name.replace(/\xA0/g, ' ');
+  name = name.replace(/\s{2,}/g, ' ');
+  name = name.replace(/(^\s+|\s+$)/g, '');
+  return name;
+}
+
+/* istanbul ignore next */
+function isLetterOrNumber(keyCode) {
+  if (keyCode < 48) { // Digit 0
+    return false;
+  }
+  if (keyCode > 90) { // Key Z
+    return false;
+  }
+  return true;
+}
+
 function createNodes(brothers_) {
   var oldLength = brothers_.length;
   var newIdx = oldLength;
@@ -91,6 +117,10 @@ function createNodes(brothers_) {
   for (var i = 0; i < oldLength; i++) {
     var bro = brothers_[i];
     bro.id = i;
+    bro.name = normalizeName(bro.name);
+    if (bro.big) {
+      bro.big = normalizeName(bro.big);
+    }
 
     var lowerCaseFamily = (bro.familystarted || '').toLowerCase();
     if (lowerCaseFamily && !familyColor[lowerCaseFamily]) {
@@ -185,15 +215,11 @@ function createNodes(brothers_) {
         var correctedName = didYouMeanWrapper(name);
         var msg;
         if (!correctedName) {
-          msg = 'Unable to find a match for '
+          msg = 'Unable to find a big brother named '
             + JSON.stringify(name);
-        } else if (name.trim() === correctedName.trim()) {
-          msg = 'Inconsistent whitespace. Expected to find '
-            + JSON.stringify(correctedName)
-            + ', but actually found ' + JSON.stringify(name) + '. These should '
-            + 'have consistent whitespace.';
         } else {
-          msg = 'Unable to find ' + JSON.stringify(name)
+          msg = 'Unable to find a big brother named '
+            + JSON.stringify(name)
             + ', did you mean ' + JSON.stringify(correctedName)
             + '?';
         }
@@ -247,7 +273,10 @@ function createNodesHelper() {
   edgesDataSet = new vis.DataSet(edgesGlobal);
 }
 
-function findBrother(name, nodes, prevElem) {
+function findBrother(name, nodes, prevElem, direction) {
+  if (direction === undefined) {
+    direction = DIRECTION.FORWARD;
+  }
   var lowerCaseName = name.toLowerCase();
   var matches = nodes.filter(function (element) {
     return element.name.toLowerCase().includes(lowerCaseName);
@@ -256,10 +285,25 @@ function findBrother(name, nodes, prevElem) {
     return undefined;
   }
 
+  var increment = 0;
+  if (direction === DIRECTION.FORWARD) {
+    increment = 1;
+  } else if (direction === DIRECTION.BACKWARD) {
+    increment = -1;
+  } else if (direction === DIRECTION.SAME_POSITION) {
+    increment = 0;
+  }
   var idx = 0;
   if (prevElem) {
     idx = matches.indexOf(prevElem);
-    idx = (idx + 1) % matches.length;
+    if (idx < 0) {
+      idx = 0;
+    } else {
+      idx = (idx + increment) % matches.length;
+      if (idx < 0) {
+        idx = matches.length + idx;
+      }
+    }
   }
   return matches[idx];
 }
@@ -272,13 +316,13 @@ function findBrother(name, nodes, prevElem) {
  * an empty query.
  */
 /* istanbul ignore next */
-function findBrotherHelper(name) {
+function findBrotherHelper(name, direction) {
   if (!name) return true; // Don't search for an empty query.
   // This requires the network to be instantiated, which implies `nodesGlobal`
   // has been populated.
   if (!network) return false;
 
-  var found = findBrother(name, nodesGlobal, previousSearchFind);
+  var found = findBrother(name, nodesGlobal, previousSearchFind, direction);
   previousSearchFind = found;
 
   if (found) {
@@ -360,25 +404,73 @@ if (typeof document !== 'undefined') {
     dropdown.onchange = function () {
       draw();
     };
-    function search() {
+    function hidePrevNextButtons() {
+      $('#prevsearch').css('display', 'none');
+      $('#nextsearch').css('display', 'none');
+    }
+    function showPrevNextButtons() {
+      $('#prevsearch').css('display', 'inline');
+      $('#nextsearch').css('display', 'inline');
+    }
+    function search(direction) {
+      var validDirection = Object.values(DIRECTION).includes(direction);
+      if (!validDirection) {
+        console.warn('Unexpected direction value: ' + direction
+          + ' (defaulting to FORWARD direction)');
+        direction = DIRECTION.FORWARD;
+      }
       var query = $('#searchbox').val();
-      var success = findBrotherHelper(query);
+      var success = findBrotherHelper(query, direction);
 
       // Indicate if the search succeeded or not.
       if (success) {
         $('#searchbox').css('background-color', 'white');
+        if (query !== '') {
+          showPrevNextButtons();
+        } else {
+          hidePrevNextButtons();
+        }
       } else {
         $('#searchbox').css('background-color', '#EEC4C6'); // red matching flag
+        hidePrevNextButtons();
       }
     }
-    document.getElementById('searchbox').onkeypress = function (e) {
+    var pendingSearch = 0;
+    document.getElementById('searchbox').onkeyup = function (e) {
       if (!e) e = window.event;
       var keyCode = e.keyCode || e.which;
-      if (keyCode === '13' || keyCode === 13 /* Enter */) {
-        search();
+      if (typeof keyCode === 'string') {
+        keyCode = Number(keyCode);
+      }
+      if (keyCode === KEYCODE_ENTER && !e.shiftKey) {
+        if (pendingSearch) {
+          clearTimeout(pendingSearch);
+        }
+        search(DIRECTION.FORWARD);
+      } else if (keyCode === KEYCODE_ENTER && e.shiftKey) {
+        if (pendingSearch) {
+          clearTimeout(pendingSearch);
+        }
+        search(DIRECTION.BACKWARD);
+      } else if (!isLetterOrNumber(keyCode)) {
+        // Do not search if the user pressed a key which does not meaningfully
+        // change the query. e.g., arrow keys, backspace, etc.
+      } else {
+        // For all other keypresses, do a same-position search. This means we
+        // keep focus on the same node as long as the search query continues
+        // matching it, otherwise we advance to the next available match.
+        if (pendingSearch) {
+          clearTimeout(pendingSearch);
+        }
+        pendingSearch = setTimeout(function () {
+          search(DIRECTION.SAME_POSITION);
+          pendingSearch = null;
+        }, 500);
       }
     };
-    document.getElementById('searchbutton').onclick = search;
+    document.getElementById('searchbutton').onclick = search.bind(undefined, DIRECTION.FORWARD);
+    document.getElementById('nextsearch').onclick = search.bind(undefined, DIRECTION.FORWARD);
+    document.getElementById('prevsearch').onclick = search.bind(undefined, DIRECTION.BACKWARD);
   });
 }
 
@@ -387,4 +479,5 @@ if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
   module.exports.createNodes = createNodes;
   module.exports.createNodesHelper = createNodesHelper;
   module.exports.findBrother = findBrother;
+  module.exports.DIRECTION = DIRECTION;
 }
